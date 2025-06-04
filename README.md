@@ -15,12 +15,10 @@ Based on [sportmarket API](https://api.sportmarket.com/docs/api/contents)
 
 ### Running
 
-'''
+```
 cd main
 go run main.go
-'''
+```
 
-Http server @
-'''
-http://localhost:8080/v1
-'''
+Http server
+> http://localhost:8080/v1
