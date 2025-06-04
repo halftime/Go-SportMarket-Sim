@@ -1,25 +1,14 @@
 package main
 
-// https://api.sportmarket.com/v1
-
 import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	// my packages
-
 	"main/server"
 )
-
-func is_client_rate_limited(w http.ResponseWriter, r *http.Request) bool {
-	// Check if the client is rate limited
-	clientId := r.RemoteAddr //r.Header.Get("session_id")
-	if server.DefaultServer.IsRateLimited(clientId) {
-		return true
-	}
-	return false
-}
 
 func http_too_many_requests(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "API limit exceeded (429)", http.StatusTooManyRequests)
@@ -34,7 +23,7 @@ func http_autherror_sessionid_invalid(w http.ResponseWriter, r *http.Request) {
 		Status: "error",
 		Code:   "auth_error",
 		Data: map[string]string{
-			"detail": "Authentication credentials were not provided.",
+			"detail": "Authentication credentials are invalid or missing.",
 		},
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -42,13 +31,36 @@ func http_autherror_sessionid_invalid(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(notAuthReply)
 }
 
-func handler_get(w http.ResponseWriter, r *http.Request) {
+func handler_get_session_fromid(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("Received GET request for session ID")
+	// confirm is logged in
 
-	fmt.Fprintln(w, "This is a GET request handler. Use POST to submit data.")
+	path := strings.TrimPrefix(r.URL.Path, "/v1/sessions/")
+	path = strings.TrimSuffix(path, "/")
+	{
+		if path == "" {
+			http.Error(w, "Session ID is required", http.StatusBadRequest)
+			return
+		}
+
+		sessionId := path
+		fmt.Printf("Received request for session ID: %s\n", sessionId)
+		w.Header().Set("Content-Type", "application/json")
+		response := server.BaseReply{
+			Status: "success",
+			Data: server.SessionData{
+				Username:    "testuser",
+				Client_type: "direct",
+			},
+		}
+		json.NewEncoder(w).Encode(response)
+		return
+	}
 }
 
-func handler_authenticate(w http.ResponseWriter, r *http.Request) {
+func handler_post_authenticate(w http.ResponseWriter, r *http.Request) { // return session_id on valid login
 	w.Header().Set("Content-Type", "application/json")
+	fmt.Println("Received POST request for authentication")
 
 	var data server.LoginRequest
 	missingParameters := make(map[string][]string)
@@ -73,11 +85,12 @@ func handler_authenticate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if data.Username == "testuser" && data.Password == "testpass" {
+	if server.DefaultServer.AuthenticateLogin(data) {
+		// Simulate successful authentication
 		w.WriteHeader(http.StatusOK)
-		response := server.ReplyEnvelope{
+		response := server.BaseReply{
 			Status: "success",
-			Data:   map[string]string{"session_id": "testsessionid"},
+			Data:   map[string]string{"session_id": server.DefaultServer.GenerateClientSessionID(data.Username)},
 		}
 		json.NewEncoder(w).Encode(response)
 		return
@@ -93,27 +106,43 @@ func handler_authenticate(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	// This will match every request as a fallback handler
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if is_client_rate_limited(w, r) {
-			// If the client is rate limited, return a 429 Too Many Requests response
-			fmt.Println("Client is rate limited:", r.RemoteAddr)
+		if server.DefaultServer.IsRateLimited(r.RemoteAddr) {
+			fmt.Println("Client is rate limited: ", r.RemoteAddr)
 			http_too_many_requests(w, r)
 			return
 		}
 
-		// Only continue if rate_limit_passthrough did not write a response
-		switch r.URL.Path {
-		case "/v1/sessions/":
-			handler_authenticate(w, r)
+		if strings.HasPrefix(r.URL.Path, "/v1/sessions/") {
+			if r.Method == http.MethodPost { // post request, user is trying to authenticate
+				fmt.Println("Received POST request for session authentication")
+				handler_post_authenticate(w, r)
+				return
+			}
 
-		case "/v1/betslips/":
-			http_autherror_sessionid_invalid(w, r)
+			// client has to be authenticated beyond this point
+			if r.Header.Get("Session") != server.DefaultServer.GenerateClientSessionID("testuser") {
+				http_autherror_sessionid_invalid(w, r)
+				fmt.Println("Invalid session ID provided")
+				return // early return if session ID is invalid
+			}
 
-		default:
+			// if we're here, client has a valid session header
+			fmt.Println("Valid session ID provided, processing GET request")
+
+			if r.Method == http.MethodGet {
+				handler_get_session_fromid(w, r)
+			}
+			return
+		} else {
 			http_not_found(w, r)
+			return
 		}
 	})
 
 	fmt.Printf("Server running @ %s\n", server.DefaultServer.URL)
 	http.ListenAndServe(":8080", nil)
 }
+
+// /v1/sessions/<session_id>/

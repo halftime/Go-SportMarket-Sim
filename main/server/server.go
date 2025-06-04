@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-type ReplyEnvelope struct {
+type BaseReply struct {
 	Status string `json:"status"`
 	Data   any    `json:"data"`
 }
@@ -19,6 +19,11 @@ type ErrorReply struct {
 type LoginRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
+}
+
+type SessionData struct {
+	Username    string `json:"username"`
+	Client_type string `json:"client_type"`
 }
 
 // Server represents the application server with configuration
@@ -98,4 +103,16 @@ func (s *Server) ResetRateLimits() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.RateLimiter = make(map[string]*RateLimit)
+}
+
+func (s *Server) AuthenticateLogin(loginreq LoginRequest) bool {
+	// This is a placeholder for actual authentication logic
+	// In a real application, you would check the credentials against a database
+	return loginreq.Username == "testuser" && loginreq.Password == "testpass"
+}
+
+func (s *Server) GenerateClientSessionID(username string) string {
+	// This is a placeholder for generating a session ID
+	// In a real application, you would generate a secure session ID
+	return "session_" + username
 }
