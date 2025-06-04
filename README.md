@@ -1,6 +1,7 @@
 ## Mock sportmarket server
 
 Based on [sportmarket API](https://api.sportmarket.com/docs/api/contents)
+
 To be used as stand server during development of trading software before having the real pay-to-use API.
 
 ### Features
