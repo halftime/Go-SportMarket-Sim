@@ -4,10 +4,11 @@ Based on [sportmarket API](https://api.sportmarket.com/docs/api/contents)
 
 ### Features
 
+
 * Simulate Http faults
-    * 404 not found
-    * 401 not authorized
-    * 429 too many requests
+    * 404 not found (invalid url)
+    * 401 not authorized (session_id missing/invalid)
+    * 429 too many requests (api limit hit)
 
 * Simulate authentication
     * return session-id on success
@@ -17,7 +18,7 @@ Based on [sportmarket API](https://api.sportmarket.com/docs/api/contents)
 
 ```
 cd main
-go run main.go
+go run servehttp.go
 ```
 
 Http server

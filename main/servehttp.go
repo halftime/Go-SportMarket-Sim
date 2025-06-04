@@ -8,19 +8,29 @@ import (
 	"net/http"
 
 	// my packages
-	"main/myerrors"
+
+	"main/server"
 )
 
-func return_http_too_many_requests(w http.ResponseWriter, r *http.Request) {
+func is_client_rate_limited(w http.ResponseWriter, r *http.Request) bool {
+	// Check if the client is rate limited
+	clientId := r.RemoteAddr //r.Header.Get("session_id")
+	if server.DefaultServer.IsRateLimited(clientId) {
+		return true
+	}
+	return false
+}
+
+func http_too_many_requests(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "API limit exceeded (429)", http.StatusTooManyRequests)
 }
 
-func return_http_not_found(w http.ResponseWriter, r *http.Request) {
+func http_not_found(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Not Found (404)", http.StatusNotFound)
 }
 
-func return_http_not_authorized(w http.ResponseWriter, r *http.Request) {
-	notAuthReply := myerrors.ErrorReply{
+func http_autherror_sessionid_invalid(w http.ResponseWriter, r *http.Request) {
+	notAuthReply := server.ErrorReply{
 		Status: "error",
 		Code:   "auth_error",
 		Data: map[string]string{
@@ -40,7 +50,7 @@ func handler_get(w http.ResponseWriter, r *http.Request) {
 func handler_authenticate(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	var data myerrors.LoginRequest
+	var data server.LoginRequest
 	missingParameters := make(map[string][]string)
 
 	err := json.NewDecoder(r.Body).Decode(&data)
@@ -52,20 +62,20 @@ func handler_authenticate(w http.ResponseWriter, r *http.Request) {
 			missingParameters["password"] = []string{"This field is required"}
 		}
 
-		notAuthReply := myerrors.ErrorReply{
+		missingParamReply := server.ErrorReply{
 			Status: "error",
 			Code:   "validation_error",
 			Data:   missingParameters,
 		}
 
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(notAuthReply)
+		json.NewEncoder(w).Encode(missingParamReply)
 		return
 	}
 
 	if data.Username == "testuser" && data.Password == "testpass" {
 		w.WriteHeader(http.StatusOK)
-		response := myerrors.ReplyEnvelope{
+		response := server.ReplyEnvelope{
 			Status: "success",
 			Data:   map[string]string{"session_id": "testsessionid"},
 		}
@@ -73,7 +83,7 @@ func handler_authenticate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	failedAuthReply := myerrors.ErrorReply{
+	failedAuthReply := server.ErrorReply{
 		Status: "error",
 		Code:   "authentication_failed",
 		Data:   "Authentication failed",
@@ -83,11 +93,27 @@ func handler_authenticate(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	http.HandleFunc("/v1/sessions/", handler_authenticate) // Handle /v1/sessions/ with 429 Too Many Requests
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if is_client_rate_limited(w, r) {
+			// If the client is rate limited, return a 429 Too Many Requests response
+			fmt.Println("Client is rate limited:", r.RemoteAddr)
+			http_too_many_requests(w, r)
+			return
+		}
 
-	http.HandleFunc("/v1", return_http_not_found)                  // Handle /v1 endpoint with 404 Not Found
-	http.HandleFunc("/v1/betslips", return_http_too_many_requests) // Handle /v1/betslips
+		// Only continue if rate_limit_passthrough did not write a response
+		switch r.URL.Path {
+		case "/v1/sessions/":
+			handler_authenticate(w, r)
 
-	fmt.Println("Server running on http://localhost:8080")
+		case "/v1/betslips/":
+			http_autherror_sessionid_invalid(w, r)
+
+		default:
+			http_not_found(w, r)
+		}
+	})
+
+	fmt.Printf("Server running @ %s\n", server.DefaultServer.URL)
 	http.ListenAndServe(":8080", nil)
 }
