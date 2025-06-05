@@ -17,6 +17,10 @@ To be used as stand server during development of trading software before having 
     * 401 not authorized (session header missing/invalid)
     * 429 too many requests (api limit hit)
 
+* Websocket
+   * receive WS on localhost 
+   * auth WS session_id /v1/stream/?token={sessionId}
+
 
 ### Usage
 
@@ -29,7 +33,7 @@ HTTP server API
 > http://localhost:8080/v1
 
 Websocket server
-> 
+> ws://localhost:8080/ws?token=session_testuser
 
 ### Todo
 
@@ -53,5 +57,4 @@ Websocket server
    * GET /v1/orders/filters/ ...
 
 * Websocket
-   * receive WS on localhost 
-   * auth WS session_id /v1/stream/?token={sessionId}
+   * ..

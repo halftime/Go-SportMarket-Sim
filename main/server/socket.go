@@ -61,6 +61,19 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 // SetupWebSocketServer initializes the WebSocket server
 func SetupWebSocketServer() {
-	http.HandleFunc("/ws", handleWebSocket)
+	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		token := r.URL.Query().Get("token")
+		if token == "" {
+			http.Error(w, "Missing token parameter", http.StatusBadRequest)
+			return
+		}
+
+		if DefaultServer.GenerateClientSessionID("testuser") != token {
+			http.Error(w, "Invalid token", http.StatusUnauthorized)
+			return
+		}
+
+		handleWebSocket(w, r)
+	})
 	log.Println("WebSocket server enabled at ws://localhost:8080/ws")
 }
