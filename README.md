@@ -2,20 +2,23 @@
 
 Based on [sportmarket API](https://api.sportmarket.com/docs/api/contents)
 
+To be used as stand server during development of trading software before having the real pay-to-use API.
+
 ### Features
 
-
-* Simulate Http faults
+* POST /v1/sessions/
+   * authenticate user & pass ; on success return session-id to client for future auth
+ 
+* GET /v1/sessions/<session_id>/
+   * return user session metadata (if client provides valid session(-id) header)
+ 
+* Simulate Http API exceptions
     * 404 not found (invalid url)
-    * 401 not authorized (session_id missing/invalid)
+    * 401 not authorized (session header missing/invalid)
     * 429 too many requests (api limit hit)
 
-* Simulate authentication
-    * return session-id on success
 
-
-
-### Running
+### Usage
 
 ```
 cd main
