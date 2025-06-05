@@ -19,11 +19,14 @@ Based on [sportmarket API](https://api.sportmarket.com/docs/api/contents)
 
 ```
 cd main
-go run servehttp.go
+go run main.go
 ```
 
 HTTP server API
 > http://localhost:8080/v1
+
+Websocket server
+> 
 
 ### Todo
 

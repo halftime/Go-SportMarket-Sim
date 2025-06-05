@@ -1,13 +1,10 @@
-package main
+package server
 
 import (
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
-
-	// my packages
-	"main/server"
 )
 
 func http_too_many_requests(w http.ResponseWriter, r *http.Request) {
@@ -19,7 +16,7 @@ func http_not_found(w http.ResponseWriter, r *http.Request) {
 }
 
 func http_autherror_sessionid_invalid(w http.ResponseWriter, r *http.Request) {
-	notAuthReply := server.ErrorReply{
+	notAuthReply := ErrorReply{
 		Status: "error",
 		Code:   "auth_error",
 		Data: map[string]string{
@@ -46,9 +43,9 @@ func handler_get_session_fromid(w http.ResponseWriter, r *http.Request) {
 		sessionId := path
 		fmt.Printf("Received request for session ID: %s\n", sessionId)
 		w.Header().Set("Content-Type", "application/json")
-		response := server.BaseReply{
+		response := BaseReply{
 			Status: "success",
-			Data: server.SessionData{
+			Data: SessionData{
 				Username:    "testuser",
 				Client_type: "direct",
 			},
@@ -62,7 +59,7 @@ func handler_post_authenticate(w http.ResponseWriter, r *http.Request) { // retu
 	w.Header().Set("Content-Type", "application/json")
 	fmt.Println("Received POST request for authentication")
 
-	var data server.LoginRequest
+	var data LoginRequest
 	missingParameters := make(map[string][]string)
 
 	err := json.NewDecoder(r.Body).Decode(&data)
@@ -74,7 +71,7 @@ func handler_post_authenticate(w http.ResponseWriter, r *http.Request) { // retu
 			missingParameters["password"] = []string{"This field is required"}
 		}
 
-		missingParamReply := server.ErrorReply{
+		missingParamReply := ErrorReply{
 			Status: "error",
 			Code:   "validation_error",
 			Data:   missingParameters,
@@ -85,18 +82,18 @@ func handler_post_authenticate(w http.ResponseWriter, r *http.Request) { // retu
 		return
 	}
 
-	if server.DefaultServer.AuthenticateLogin(data) {
+	if DefaultServer.AuthenticateLogin(data) {
 		// Simulate successful authentication
 		w.WriteHeader(http.StatusOK)
-		response := server.BaseReply{
+		response := BaseReply{
 			Status: "success",
-			Data:   map[string]string{"session_id": server.DefaultServer.GenerateClientSessionID(data.Username)},
+			Data:   map[string]string{"session_id": DefaultServer.GenerateClientSessionID(data.Username)},
 		}
 		json.NewEncoder(w).Encode(response)
 		return
 	}
 
-	failedAuthReply := server.ErrorReply{
+	failedAuthReply := ErrorReply{
 		Status: "error",
 		Code:   "authentication_failed",
 		Data:   "Authentication failed",
@@ -105,10 +102,10 @@ func handler_post_authenticate(w http.ResponseWriter, r *http.Request) { // retu
 	json.NewEncoder(w).Encode(failedAuthReply)
 }
 
-func main() {
+func SetupHttpServer() {
 	// This will match every request as a fallback handler
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if server.DefaultServer.IsRateLimited(r.RemoteAddr) {
+		if DefaultServer.IsRateLimited(r.RemoteAddr) {
 			fmt.Println("Client is rate limited: ", r.RemoteAddr)
 			http_too_many_requests(w, r)
 			return
@@ -122,7 +119,7 @@ func main() {
 			}
 
 			// client has to be authenticated beyond this point
-			if r.Header.Get("Session") != server.DefaultServer.GenerateClientSessionID("testuser") {
+			if r.Header.Get("Session") != DefaultServer.GenerateClientSessionID("testuser") {
 				http_autherror_sessionid_invalid(w, r)
 				fmt.Println("Invalid session ID provided")
 				return // early return if session ID is invalid
@@ -141,7 +138,7 @@ func main() {
 		}
 	})
 
-	fmt.Printf("Server running @ %s\n", server.DefaultServer.URL)
+	fmt.Printf("Server running @ %s\n", DefaultServer.URL)
 	http.ListenAndServe(":8080", nil)
 }
 
