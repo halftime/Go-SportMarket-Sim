@@ -87,7 +87,7 @@ func handler_post_authenticate(w http.ResponseWriter, r *http.Request) { // retu
 		w.WriteHeader(http.StatusOK)
 		response := BaseReply{
 			Status: "success",
-			Data:   map[string]string{"session_id": DefaultServer.GenerateClientSessionID(data.Username)},
+			Data:   DefaultServer.GenerateClientSessionID(data.Username),
 		}
 		json.NewEncoder(w).Encode(response)
 		return
